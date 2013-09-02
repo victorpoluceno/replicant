@@ -2,15 +2,14 @@ import uuid
 import sqlite3
 
 
-REPLICANT_QUEUE = '_replicant_queue'
-REPLICANT_LAST_SEQ = '_replicant_last_seq'
-REPLICANT_ORIGIN_TABLE = '_replicant_origin'
+REPLICANT_QUEUE_TABLE = '_replicant_queue'
+REPLICANT_CONFIG_TABLE = '_replicant_config'
 REPLICANT_ORIGIN_COLUMN = '_replicant_origin'
 
 
 class SQL:
     def __init__(self, config, schema):
-        self.database_uri = config['database_uri']
+        self.database_uri = config['sql_uri']
         self.schema = schema
 
     def connect(self):
@@ -24,25 +23,21 @@ class SQL:
         # create replicant queue table
         cursor.execute("CREATE TABLE IF NOT EXISTS %s "
                        "(_key INTEGER NOT NULL, _table TEXT, _action TEXT)"
-                       % REPLICANT_QUEUE)
+                       % REPLICANT_QUEUE_TABLE)
 
-        # create replicant last sequency table
-        cursor.execute("CREATE TABLE IF NOT EXISTS %s (id INTEGER)"
-                       % REPLICANT_LAST_SEQ)
-
-        # create replicant origin table to hold the origin uuid
-        cursor.execute("CREATE TABLE IF NOT EXISTS %s (origin TEXT NOT NULL)"
-                       % REPLICANT_ORIGIN_TABLE)
+        # create replicant config table to hold replicant config
+        cursor.execute("CREATE TABLE IF NOT EXISTS %s (origin TEXT NOT NULL,"
+                       "last_seq INTEGER)" % REPLICANT_CONFIG_TABLE)
 
         # check if there is an database id already
         result = cursor.execute("SELECT origin FROM %s LIMIT 1"
-                                % REPLICANT_ORIGIN_TABLE)
+                                % REPLICANT_CONFIG_TABLE)
         row = result.fetchone()
         database_id = row['origin'] if row else None
         if not database_id:
             self.database_id = str(uuid.uuid4())
             cursor.execute("INSERT INTO %s (origin) VALUES ('%s')" 
-                           % (REPLICANT_ORIGIN_TABLE, self.database_id))
+                           % (REPLICANT_CONFIG_TABLE, self.database_id))
 
     def alter_schema(self):
         cursor = self.conn.cursor()
@@ -103,20 +98,22 @@ class SQL:
 
     def queue_size(self):
         cursor = self.conn.cursor()
-        result = cursor.execute("SELECT count(*) FROM %s " % REPLICANT_QUEUE)
+        result = cursor.execute("SELECT count(*) FROM %s "
+                                % REPLICANT_QUEUE_TABLE)
         return result.fetchone()[0] if result else 0
         
     def queue_remove(self, callback):
         cursor = self.conn.cursor()
         result = cursor.execute("SELECT rowid, _key, _table, _action FROM %s "
-                                "ORDER BY rowid LIMIT 1" % REPLICANT_QUEUE)
+                                "ORDER BY rowid LIMIT 1"
+                                % REPLICANT_QUEUE_TABLE)
         row = result.fetchone() if result else None
         if not row:
             return False
 
         if callback(row):
             cursor.execute("DELETE FROM %s WHERE rowid=%d"
-                           % (REPLICANT_QUEUE, row['rowid']))
+                           % (REPLICANT_QUEUE_TABLE, row['rowid']))
 
         return True
 
@@ -125,3 +122,15 @@ class SQL:
         result = cursor.execute("SELECT * FROM %s WHERE id=%d" % (table, key))
         return result.fetchone() if result else None
        
+    def save_last_seq(self, seq):
+        cursor = self.conn.cursor()
+        cursor.execute('UPDATE %s SET last_seq=%d'
+                       % (REPLICANT_CONFIG_TABLE, seq))
+
+        self.conn.commit()
+
+    def get_last_seq(self):
+        cursor = self.conn.cursor()
+        result = cursor.execute('SELECT last_seq FROM %s'
+                                % REPLICANT_CONFIG_TABLE)
+        return result.fetchone()['last_seq'] if result else None

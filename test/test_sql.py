@@ -16,7 +16,7 @@ schema = {
 
 class TestSQL(unittest.TestCase):
     def setUp(self):
-        self.sql = sql.SQL({'database_uri': ':memory:'}, schema)
+        self.sql = sql.SQL({'sql_uri': ':memory:'}, schema)
         self.conn = self.sql.connect()
 
     def test_connect(self):
@@ -25,19 +25,15 @@ class TestSQL(unittest.TestCase):
     def test_initialize(self):
         self.sql.initialize()
         result = self.conn.execute('SELECT name FROM sqlite_master WHERE '
-                                   'name=?', (sql.REPLICANT_QUEUE,))
+                                   'name=?', (sql.REPLICANT_QUEUE_TABLE,))
         self.assertNotEqual(result.fetchone(), None)
 
         result = self.conn.execute('SELECT name FROM sqlite_master WHERE '
-                                   'name=?', (sql.REPLICANT_LAST_SEQ,))
-        self.assertNotEqual(result.fetchone(), None)
-
-        result = self.conn.execute('SELECT name FROM sqlite_master WHERE '
-                                   'name=?', (sql.REPLICANT_ORIGIN_TABLE,))
+                                   'name=?', (sql.REPLICANT_CONFIG_TABLE,))
         self.assertNotEqual(result.fetchone(), None)
 
         result = self.conn.execute('SELECT origin FROM %s LIMIT 1'
-                                   % sql.REPLICANT_ORIGIN_TABLE)
+                                   % sql.REPLICANT_CONFIG_TABLE)
         self.assertEqual(result.fetchone()['origin'], self.sql.database_id)  
 
     def test_alter_schema(self):
@@ -57,6 +53,7 @@ class TestSQL(unittest.TestCase):
 
     def test_create_triggers(self):
         self.sql.initialize()
+        self.assertEqual(self.sql.create_triggers(), False)
 
         self.conn.execute('CREATE TABLE test1 (id TEXTO PRIMARY KEY, '
                           'field_a INTEGER, field_b TEXT)')
@@ -86,7 +83,7 @@ class TestSQL(unittest.TestCase):
         self.conn.execute('UPDATE test1 SET field_b="y";')
         self.conn.execute('DELETE FROM test1 WHERE id=1;')
         result = self.conn.execute('SELECT * FROM %s ORDER BY rowid'
-                                   % sql.REPLICANT_QUEUE).fetchall()
+                                   % sql.REPLICANT_QUEUE_TABLE).fetchall()
 
         self.assertEqual(len(result), 3)
         self.assertEqual(result[0]['_table'], 'test1')
@@ -104,7 +101,7 @@ class TestSQL(unittest.TestCase):
         self.conn.execute('INSERT INTO test1 (id, field_a, field_b, '
                           '_replicant_origin) VALUES (1, 1, "y", "remote");')
         result = self.conn.execute('SELECT * FROM %s ORDER BY rowid'
-                                   % sql.REPLICANT_QUEUE).fetchall()
+                                   % sql.REPLICANT_QUEUE_TABLE).fetchall()
         self.assertEqual(len(result), 3)
         
     def test_replicant_queue_size(self):
@@ -138,11 +135,7 @@ class TestSQL(unittest.TestCase):
             return True
         self.assertEqual(self.sql.queue_remove(queue_remove_callback), True)
         self.assertEqual(self.sql.queue_size(), 0)
-
-        def queue_remove_callback(row):
-            self.asserEqual(row, None)
-            return True
-        self.assertEqual(self.sql.queue_remove(queue_remove_callback), False)
+        self.assertEqual(self.sql.queue_remove(None), False)
 
     def test_retrieve_doc(self):
         self.conn.execute('CREATE TABLE test1 (id TEXTO PRIMARY KEY, '
@@ -152,6 +145,18 @@ class TestSQL(unittest.TestCase):
         self.assertNotEqual(self.sql.retrieve_doc('test1', 1), None)
         self.assertEqual(self.sql.retrieve_doc('test1', 1)['id'], '1')
         self.assertEqual(self.sql.retrieve_doc('test1', 1)['field_a'], 1)
+
+    def test_save_last_seq(self):
+        self.sql.initialize()
+        self.sql.save_last_seq(1)
+        self.assertEqual(self.sql.get_last_seq(), 1)
+
+    def test_get_last_seq(self):
+        self.sql.initialize()
+        self.assertEqual(self.sql.get_last_seq(), None)
+        self.sql.save_last_seq(1)
+        self.sql.save_last_seq(2)
+        self.assertEqual(self.sql.get_last_seq(), 2)
 
 
 if __name__ == '__main__':

@@ -16,3 +16,12 @@ Edit /etc/couchdb/local.ini and change bind_address to 0.0.0.0 then::
 Create the initial database::
 
     create table test1 (id TEXTO PRIMARY KEY, field_a INTEGER, field_b TEXT);
+
+Run coverage::
+
+    coverage run test/test_sql.py
+    
+    coverage report -m
+    
+    coverage html
+    python -m SimpleHTTPServer 8080
