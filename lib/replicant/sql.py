@@ -119,3 +119,9 @@ class SQL:
                            % (REPLICANT_QUEUE, row['rowid']))
 
         return True
+
+    def retrieve_doc(self, table, key):
+        cursor = self.conn.cursor()
+        result = cursor.execute("SELECT * FROM %s WHERE id=%d" % (table, key))
+        return result.fetchone() if result else None
+       

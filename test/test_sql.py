@@ -144,6 +144,14 @@ class TestSQL(unittest.TestCase):
             return True
         self.assertEqual(self.sql.queue_remove(queue_remove_callback), False)
 
+    def test_retrieve_doc(self):
+        self.conn.execute('CREATE TABLE test1 (id TEXTO PRIMARY KEY, '
+                  'field_a INTEGER, field_b TEXT)')
+        self.conn.execute('INSERT INTO test1 (id, field_a, field_b) '
+                  'VALUES (1, 1, "x");')
+        self.assertNotEqual(self.sql.retrieve_doc('test1', 1), None)
+        self.assertEqual(self.sql.retrieve_doc('test1', 1)['id'], '1')
+        self.assertEqual(self.sql.retrieve_doc('test1', 1)['field_a'], 1)
 
 
 if __name__ == '__main__':
