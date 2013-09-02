@@ -60,9 +60,8 @@ class SQL:
                                % (REPLICANT_ORIGIN_COLUMN, table))
             except sqlite3.OperationalError:
                 # add column origin field
-                cursor.execute("ALTER TABLE %s ADD COLUMN %s TEXT DEFAULT '%s'"
-                               % (table, REPLICANT_ORIGIN_COLUMN, 
-                                  self.database_id))
+                cursor.execute("ALTER TABLE %s ADD COLUMN %s TEXT DEFAULT NULL;"
+                               % (table, REPLICANT_ORIGIN_COLUMN))
 
         return True
 
@@ -75,22 +74,23 @@ class SQL:
                                     "name=?", (table,))
             if not result.fetchone():
                 return False
-            
-            cursor.execute('''CREATE TRIGGER IF NOT EXISTS _replicant_%s_i 
+
+            stmt = '''CREATE TRIGGER IF NOT EXISTS _replicant_%s_i 
                 AFTER INSERT ON %s 
-                WHEN NEW.origin != "%s"
+                WHEN NEW.%s ISNULL
                 BEGIN
                     INSERT INTO _replicant_queue (_key, _table, _action) 
                        VALUES (NEW.id, '%s', 'I');
-                END;''' % (table, table, self.database_id, table))
+                END;''' % (table, table, REPLICANT_ORIGIN_COLUMN, table)
+            cursor.execute(stmt)
             
             cursor.execute('''CREATE TRIGGER IF NOT EXISTS _replicant_%s_u 
                 AFTER UPDATE ON %s 
-                WHEN NEW.origin != "%s"
+                WHEN NEW.%s ISNULL
                 BEGIN
                     INSERT INTO _replicant_queue (_key, _table, _action) 
                        VALUES (NEW.id, '%s', 'U');
-                END;''' % (table, table, self.database_id, table))
+                END;''' % (table, table, REPLICANT_ORIGIN_COLUMN, table))
 
             cursor.execute('''CREATE TRIGGER IF NOT EXISTS _replicant_%s_d 
                 AFTER DELETE ON %s 
