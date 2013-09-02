@@ -60,7 +60,7 @@ class SQL:
                                % (REPLICANT_ORIGIN_COLUMN, table))
             except sqlite3.OperationalError:
                 # add column origin field
-                cursor.execute("ALTER TABLE %s ADD COLUMN %s TEXT DEFAULT NULL;"
+                cursor.execute("ALTER TABLE %s ADD COLUMN %s TEXT;"
                                % (table, REPLICANT_ORIGIN_COLUMN))
 
         return True
@@ -98,5 +98,24 @@ class SQL:
                     INSERT INTO _replicant_queue (_key, _table, _action) 
                        VALUES (OLD.id, '%s', 'D');
                 END;''' % (table, table, table))
+
+        return True
+
+    def queue_size(self):
+        cursor = self.conn.cursor()
+        result = cursor.execute("SELECT count(*) FROM %s " % REPLICANT_QUEUE)
+        return result.fetchone()[0] if result else 0
+        
+    def queue_remove(self, callback):
+        cursor = self.conn.cursor()
+        result = cursor.execute("SELECT rowid, _key, _table, _action FROM %s "
+                                "ORDER BY rowid LIMIT 1" % REPLICANT_QUEUE)
+        row = result.fetchone() if result else None
+        if not row:
+            return False
+
+        if callback(row):
+            cursor.execute("DELETE FROM %s WHERE rowid=%d"
+                           % (REPLICANT_QUEUE, row['rowid']))
 
         return True

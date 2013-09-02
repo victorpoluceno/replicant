@@ -24,16 +24,16 @@ class TestSQL(unittest.TestCase):
 
     def test_initialize(self):
         self.sql.initialize()
-        result = self.conn.execute('SELECT name FROM sqlite_master WHERE name=?',
-                          (sql.REPLICANT_QUEUE,))
+        result = self.conn.execute('SELECT name FROM sqlite_master WHERE '
+                                   'name=?', (sql.REPLICANT_QUEUE,))
         self.assertNotEqual(result.fetchone(), None)
 
-        result = self.conn.execute('SELECT name FROM sqlite_master WHERE name=?',
-                          (sql.REPLICANT_LAST_SEQ,))
+        result = self.conn.execute('SELECT name FROM sqlite_master WHERE '
+                                   'name=?', (sql.REPLICANT_LAST_SEQ,))
         self.assertNotEqual(result.fetchone(), None)
 
-        result = self.conn.execute('SELECT name FROM sqlite_master WHERE name=?',
-                          (sql.REPLICANT_ORIGIN_TABLE,))
+        result = self.conn.execute('SELECT name FROM sqlite_master WHERE '
+                                   'name=?', (sql.REPLICANT_ORIGIN_TABLE,))
         self.assertNotEqual(result.fetchone(), None)
 
         result = self.conn.execute('SELECT origin FROM %s LIMIT 1'
@@ -63,16 +63,16 @@ class TestSQL(unittest.TestCase):
         self.assertEqual(self.sql.create_triggers(), True)
 
         for table in schema.keys():
-            result = self.conn.execute('SELECT name FROM sqlite_master WHERE name=?',
-                          ('_replicant_%s_i' % table,))
+            result = self.conn.execute('SELECT name FROM sqlite_master WHERE '
+                                       'name=?', ('_replicant_%s_i' % table,))
             self.assertNotEqual(result.fetchone(), None)
 
-            result = self.conn.execute('SELECT name FROM sqlite_master WHERE name=?',
-                          ('_replicant_%s_u' % table,))
+            result = self.conn.execute('SELECT name FROM sqlite_master WHERE '
+                                       'name=?', ('_replicant_%s_u' % table,))
             self.assertNotEqual(result.fetchone(), None)
 
-            result = self.conn.execute('SELECT name FROM sqlite_master WHERE name=?',
-                          ('_replicant_%s_d' % table,))
+            result = self.conn.execute('SELECT name FROM sqlite_master WHERE '
+                                       'name=?', ('_replicant_%s_d' % table,))
             self.assertNotEqual(result.fetchone(), None)
 
     def test_replicant_triggers(self):
@@ -81,7 +81,8 @@ class TestSQL(unittest.TestCase):
                           'field_a INTEGER, field_b TEXT)')
         self.sql.alter_schema()
         self.sql.create_triggers()
-        self.conn.execute('INSERT INTO test1 (id, field_a, field_b) VALUES (1, 1, "x");')
+        self.conn.execute('INSERT INTO test1 (id, field_a, field_b) '
+                          'VALUES (1, 1, "x");')
         self.conn.execute('UPDATE test1 SET field_b="y";')
         self.conn.execute('DELETE FROM test1 WHERE id=1;')
         result = self.conn.execute('SELECT * FROM %s ORDER BY rowid'
@@ -106,6 +107,44 @@ class TestSQL(unittest.TestCase):
                                    % sql.REPLICANT_QUEUE).fetchall()
         self.assertEqual(len(result), 3)
         
+    def test_replicant_queue_size(self):
+        self.conn.execute('CREATE TABLE test1 (id TEXTO PRIMARY KEY, '
+                          'field_a INTEGER, field_b TEXT)')
+        
+        self.sql.initialize()
+        self.sql.alter_schema()
+        self.sql.create_triggers()
+        self.conn.execute('INSERT INTO test1 (id, field_a, field_b) VALUES '
+                          '(1, 1, "x");')
+        self.assertEqual(self.sql.queue_size(), 1)
+
+    def test_replicant_queue_remove(self):
+        self.conn.execute('CREATE TABLE test1 (id TEXTO PRIMARY KEY, '
+                          'field_a INTEGER, field_b TEXT)')
+        
+        self.sql.initialize()
+        self.sql.alter_schema()
+        self.sql.create_triggers()
+        self.conn.execute('INSERT INTO test1 (id, field_a, field_b) '
+                          'VALUES (1, 1, "x");')
+        
+        def queue_remove_callback(row):
+            self.assertNotEqual(row, None)
+        self.assertEqual(self.sql.queue_remove(queue_remove_callback), True)
+        self.assertEqual(self.sql.queue_size(), 1)
+
+        def queue_remove_callback(row):
+            self.assertNotEqual(row, None)
+            return True
+        self.assertEqual(self.sql.queue_remove(queue_remove_callback), True)
+        self.assertEqual(self.sql.queue_size(), 0)
+
+        def queue_remove_callback(row):
+            self.asserEqual(row, None)
+            return True
+        self.assertEqual(self.sql.queue_remove(queue_remove_callback), False)
+
+
 
 if __name__ == '__main__':
     unittest.main()
