@@ -134,3 +134,11 @@ class SQL:
         result = cursor.execute('SELECT last_seq FROM %s'
                                 % REPLICANT_CONFIG_TABLE)
         return result.fetchone()['last_seq'] if result else None
+
+    def insert_doc(self, table, doc):
+        keys = ','.join([ str(k) for k in doc.keys() ] + 
+                        [REPLICANT_ORIGIN_COLUMN])
+        values = ','.join([ '?' for _ in range(len(doc)+1) ])
+        stmt = 'INSERT INTO %s (%s) VALUES (%s)' % (table, keys, values)
+        self.conn.execute(stmt, doc.values() + ['remote'])
+        return True

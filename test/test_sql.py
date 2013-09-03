@@ -158,6 +158,24 @@ class TestSQL(unittest.TestCase):
         self.sql.save_last_seq(2)
         self.assertEqual(self.sql.get_last_seq(), 2)
 
+    def test_insert(self):
+        self.conn.execute('CREATE TABLE test1 (id TEXTO PRIMARY KEY, '
+                          'field_a INTEGER, field_b TEXT)')
+        self.sql.initialize()
+        self.sql.alter_schema()
+        self.sql.create_triggers()
+        doc = {'id': '1', 'field_a': 1, 'field_b': 'x'}
+        self.assertEqual(self.sql.insert_doc('test1', doc), True)
+        result = self.conn.execute('SELECT * FROM test1 WHERE id=?', doc['id'])
+        row = result.fetchone()
+        self.assertNotEqual(row, None)
+        self.assertEqual(row[sql.REPLICANT_ORIGIN_COLUMN], 'remote')
+        
+        result = self.conn.execute('SELECT * FROM %s'
+                                   % sql.REPLICANT_QUEUE_TABLE)
+        row = result.fetchone()   
+        self.assertEqual(row, None)
+
 
 if __name__ == '__main__':
     unittest.main()
