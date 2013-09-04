@@ -20,6 +20,6 @@ Create the initial database::
 Run coverage::
 
     coverage run test/test_sql.py
-    coverage report -m
+    coverage report -m --omit=*gevent*,*couchdb*,*pkg_resources*
     coverage html
     python -m SimpleHTTPServer 8080

@@ -20,7 +20,11 @@ class TestNoSQL(unittest.TestCase):
                                   'database_name': 'data'}, schema)
 
     def test_connect(self):
-        self.assertNotEqual(self.nosql.connect, None)
+        self.assertNotEqual(self.nosql.connect(), None)
+
+    def test_run(self):
+        self.nosql.connect()
+        self.assertEqual(self.nosql.run(), True)
 
 
 if __name__ == '__main__':
