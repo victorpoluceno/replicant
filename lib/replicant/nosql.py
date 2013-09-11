@@ -2,10 +2,10 @@ import couchdb
 
 
 class NoSQL:
-    def __init__(self, config, schema):
-        self.nosql_uri = config['nosql_uri']
-        self.database_name = config['database_name']
+    def __init__(self, schema, **kwargs):
         self.schema = schema
+        self.nosql_uri = kwargs['nosql_uri']
+        self.database_name = kwargs['database_name']
         
     def connect(self):
         self.conn = couchdb.Server(self.nosql_uri)
@@ -16,34 +16,44 @@ class NoSQL:
 
         return self.conn
 
-    def process(self, callback, last_seq):
+    def load(self, last_seq, callback):
         changes = self.database.changes(since=last_seq, include_docs=True,
                                         style="all_docs")
-        for r in changes['results']:
-            seq = r.get('seq')
-            if seq is None:
-                continue
+        for change in changes['results']:
+            table, key = change['id'].split('/')
 
-            table, key = r['id'].split('/')
-            payload = r.get('payload', {})
-            delete = r.get('deleted', False)
-            if delete:
-                payload['id'] = key
+            # if callback return False the transaction was not processed
+            # so we must stop here
+            if not callback(table, key, doc=change['doc'].get('payload', {}),
+                            deleted=change.get('deleted', False)):
+                return False
 
-            if not callback(table, payload, delete):
-                break
-            
-        return seq
+            self.last_seq = change['seq']
+        
+        return True
 
-    def update(self, table, doc, delete):
-        _id = "%s/%s" % (table, doc['id'])
-        try:
-            old = self.database.get(_id)
-        except IndexError:
-            if delete:
+    def dump(self, table, key, **kwargs):
+        # using a composed key as collection separator
+        _id = "%s/%s" % (table, key)
+
+        if kwargs.get('deleted'):
+            try:
                 del self.database[_id]
-            else:
-                self.database[_id] = {'payload': doc}
+            except couchdb.ResourceNotFound:
+                return False
+
+            return True
+    
+        # needed to decided if it is a insert or update operation
+        try:
+            doc = {}
+            doc = self.database.get(_id)
+        except IndexError:
+            pass
+
+        if not doc:
+            self.database[_id] = {'payload': kwargs['payload']}
         else:
-            new = old.update(doc)
-            self.database[_id] = new
+            self.database.update(_id, kwargs['payload'])
+
+        return True

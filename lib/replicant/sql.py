@@ -1,7 +1,5 @@
 import sqlite3
 
-import gevent
-
 
 REPLICANT_LOG_TABLE = '_replicant_log'
 REPLICANT_META_TABLE = '_replicant_meta'
@@ -171,10 +169,12 @@ class SQL:
             if doc:
                 doc = dict(doc)
 
+            # if is not a delete is an insert or update
             delete = False
             if item['_action'] == 'D':
                 delete = True
 
+            # if callback return true is safe to remove item from queue
             if callback(item['_table'], doc, delete):
                 self.queue_remove()
             

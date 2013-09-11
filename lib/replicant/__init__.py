@@ -12,14 +12,12 @@ class Replicant:
         self.sql.alter_schema()
         self.sql.create_triggers()
 
-        self.nosql = nosql.NoSQL(config, schema)
+        self.nosql = nosql.NoSQL(schema, **config)
         self.nosql.connect()
 
     def run(self):
         seq = self.sql.get_last_seq()
-        last_seq = self.nosql.process(self.sql.update, seq)
-        if last_seq:    
-            self.sql.set_last_seq(last_seq)
-        
+        self.nosql.load(seq, self.sql.update)
+        self.sql.set_last_seq(last_seq)
         self.sql.process(self.nosql.update)
 

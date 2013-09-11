@@ -17,9 +17,13 @@ Create the initial database::
 
     create table test1 (id TEXTO PRIMARY KEY, field_a INTEGER, field_b TEXT);
 
+Run tests:
+
+    python -m unittest discover test/
+
 Run coverage::
 
-    coverage run test/test_sql.py
+    coverage run -m unittest discover test/
     coverage report -m --omit=*gevent*,*couchdb*,*pkg_resources*
     coverage html
     python -m SimpleHTTPServer 8080
